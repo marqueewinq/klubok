@@ -1,0 +1,42 @@
+version: '3.4'
+
+x-environment:
+  &shared-envvar
+  - POSTGRES_USER: "klubok"
+  - POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+  - DATABASE_URL: "postgis://klubok:${POSTGRES_PASSWORD}@db:5432/postgres"
+
+services:
+
+  db:
+    image: postgis/postgis:15-3.3-alpine
+    environment:
+      << : *shared-envvar
+    # volumes:
+    #   - ./misc/dbdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    image: klubok-backend
+    build: .
+    environment:
+      << : *shared-envvar
+      ALLOWED_HOSTS: '["localhost"]'
+      CORS_ALLOWED_ORIGINS: '["http://localhost"]'
+    # Docker hack to wait until Postgres is up, then run stuff.
+    command: >
+      bash -c "while ! nc -w 1 -z db 5432;
+               do sleep 0.1;
+               done;
+               ./manage.py migrate;
+               while :;
+               do ./manage.py runserver 0.0.0.0:80;
+               sleep 1;
+               done"
+    ports:
+      - "80:80"
+    volumes:
+      - ./klubok:/code
+    depends_on:
+      - db

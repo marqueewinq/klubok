@@ -1,0 +1,25 @@
+stages:
+    - test
+    - deploy
+
+test_unittest:
+    image: python:3.7
+    stage: test
+    before_script:
+        - pip3 install -r requirements.txt
+    script:
+        - python3 klubok/manage.py test klubok
+
+deploy_heroku:
+    image: ruby:latest
+    stage: deploy
+    when: manual
+    environment:
+        name: heroku_staging
+        url: $HEROKU_APP_HOST
+    before_script:
+        - gem install dpl
+    script:
+        - dpl --provider=heroku --app=$HEROKU_APP_NAME --api-key=$HEROKU_API_KEY
+    only:
+        - master
