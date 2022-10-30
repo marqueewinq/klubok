@@ -15,11 +15,17 @@ def filter_queryset(queryset, serializer: PlaceSearchSerializer):
         queryset = queryset.filter(rating__gte=rating)
 
     if "tags_titles" in serializer.validated_data:
-        tags_titles = serializer.validated_data["tags_titles"]
-
-        queryset = queryset.filter(tags__title__in=tags_titles)
-
-    # TODO: add the same filters on: types, priceranges, promos
+        queryset = queryset.filter(
+            tags__title__in=serializer.validated_data["tags_titles"]
+        )
+    if "types_titles" in serializer.validated_data:
+        queryset = queryset.filter(
+            types__title__in=serializer.validated_data["types_titles"]
+        )
+    if "priceranges_titles" in serializer.validated_data:
+        queryset = queryset.filter(
+            priceranges__title__in=serializer.validated_data["priceranges_titles"]
+        )
 
     if (
         "location" in serializer.validated_data
@@ -32,4 +38,4 @@ def filter_queryset(queryset, serializer: PlaceSearchSerializer):
             distance__lte=distance
         )
 
-    return queryset
+    return queryset.distinct()

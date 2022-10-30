@@ -25,6 +25,8 @@ class Place(BaseModel):
         "geoplaces.PlacePricerange", related_name="places"
     )
 
+    promo_code = models.CharField(max_length=255, null=True, blank=True, default=None)
+
     def __str__(self):
         return f"{self.title}"
 

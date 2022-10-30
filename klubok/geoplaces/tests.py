@@ -46,11 +46,11 @@ class TestPlaceAPI(APITestCase):
             [PlacePricerange(title="$" * i) for i in range(3)]
         )
 
-        self.n_places = 50
+        self.n_places = 5
         for i in range(self.n_places):
-            n_tags = random.randint(0, 3)
-            n_types = random.randint(0, 3)
-            n_priceranges = random.randint(0, 3)
+            n_tags = random.randint(1, 9)
+            n_types = random.randint(1, 9)
+            n_priceranges = random.randint(1, 9)
             place = Place.objects.create(
                 title=generate(8),
                 description=generate(24),
@@ -66,31 +66,105 @@ class TestPlaceAPI(APITestCase):
         response = self.client.get(reverse("place-list"))
         self.assertEqual(200, response.status_code)
 
+    @staticmethod
+    def _run_target(data):
+        serializer = PlaceSearchSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return filter_queryset(queryset=Place.objects.all(), serializer=serializer)
+
     def test_search_filter_queryset_text(self):
         random_place = Place.objects.order_by("?").first()
         data = {"text": random_place.title}
-        serializer = PlaceSearchSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        queryset = filter_queryset(queryset=Place.objects.all(), serializer=serializer)
+        queryset = self._run_target(data)
         self.assertEqual(1, queryset.count())
         self.assertEqual(random_place.uuid, queryset.first().uuid)
 
-    def test_search_filter_queryset_gis(self):
-        def run_target(data):
-            serializer = PlaceSearchSerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            return filter_queryset(queryset=Place.objects.all(), serializer=serializer)
+    def test_search_filter_queryset_m2m(self):
+        tags = PlaceTag.objects.order_by("?")[:2]
+        data = {"tags__titles": [t.title for t in tags]}
+        queryset = self._run_target(data)
+        self.assertEqual(
+            Place.objects.filter(tags__in=tags).distinct().count(), queryset.count()
+        )
 
+        types = PlaceType.objects.order_by("?")[:2]
+        data = {"types__titles": [t.title for t in types]}
+        queryset = self._run_target(data)
+        self.assertEqual(
+            Place.objects.filter(types__in=types).distinct().count(), queryset.count()
+        )
+
+        ranges = PlacePricerange.objects.order_by("?")[:2]
+        data = {"priceranges__titles": [t.title for t in ranges]}
+        queryset = self._run_target(data)
+        self.assertEqual(
+            Place.objects.filter(priceranges__in=ranges).distinct().count(),
+            queryset.count(),
+        )
+
+    def test_search_filter_queryset_gis(self):
         faraway_data = {
             "distance": 5.0,
             "location": {"type": "Point", "coordinates": [2.0, 2.0]},
         }
-        queryset = run_target(faraway_data)
+        queryset = self._run_target(faraway_data)
         self.assertEqual(0, queryset.count())
 
         nearby_data = {
             "distance": 1_000_000.0,
             "location": {"type": "Point", "coordinates": [10.0, 20.0]},
+            "rating": 1,
         }
-        queryset = run_target(nearby_data)
+        queryset = self._run_target(nearby_data)
         self.assertTrue(queryset.count() > 0)
+
+    def test_search_filter_queryset_gis_realdata(self):
+        my_location = (30.248_418_046_654_855, 59.943_254_885_423_31)
+        places = [
+            (30.304_845_367_774_753, 59.943_085_766_577_525),
+            (30.325_740_996_093_44, 59.930_767_681_937_645),
+        ]
+
+        for idx, (lat, lon) in enumerate(places):
+            Place.objects.create(
+                title=generate(8),
+                description=generate(24),
+                url_img=f"http://images.com/{generate(4)}",
+                rating=idx + 1,
+                location=Point(lat, lon),
+            )
+
+        real_data_list = [
+            (
+                {
+                    "distance": 3500.0,
+                    "location": {"type": "Point", "coordinates": my_location},
+                },
+                1,
+            ),
+            (
+                {
+                    "distance": 5000.0,
+                    "location": {"type": "Point", "coordinates": my_location},
+                },
+                2,
+            ),
+            (
+                {
+                    "distance": 5000.0,
+                    "location": {"type": "Point", "coordinates": my_location},
+                    "rating": 2,  # 2 and more
+                },
+                1,
+            ),
+            (
+                {
+                    "distance": 3000.0,
+                    "location": {"type": "Point", "coordinates": my_location},
+                },
+                0,
+            ),
+        ]
+        for real_data, expected_count in real_data_list:
+            queryset = self._run_target(real_data)
+            self.assertEqual(expected_count, queryset.count())

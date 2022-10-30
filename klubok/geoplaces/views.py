@@ -7,7 +7,17 @@ from geoplaces.search import filter_queryset
 
 class PlaceViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    API endpoint that allows places to be viewed.
+    API endpoint that allows places to be viewed or searched.
+
+    Include additional query parameters to perform filter on the objects:
+
+     - text: str
+     - location: geojson
+     - distance: float, in meters
+     - rating: int, in range 1..5
+     - tags_titles: list of str as str (delimeter: ',')
+     - types_titles: list of str as str (delimeter: ',')
+     - priceranges_titles: list of str as str (delimeter: ',')
     """
 
     serializer_class = PlaceSerializer
