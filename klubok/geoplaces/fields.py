@@ -7,5 +7,6 @@ class CharacterSeparatedField(serializers.ListField):
         super().__init__(*args, **kwargs)
 
     def to_internal_value(self, data):
+        data = ",".join(data)
         data = data.split(self.separator)
         return super().to_internal_value(data)

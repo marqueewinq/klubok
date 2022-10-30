@@ -24,4 +24,6 @@ RUN pip3 install --upgrade pip && \
 
 COPY ./klubok/ /code/klubok/
 
-CMD ["gunicorn", "klubok.wsgi"]
+WORKDIR /code/klubok
+
+CMD ["bash", "start.sh"]

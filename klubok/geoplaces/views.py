@@ -15,9 +15,9 @@ class PlaceViewSet(viewsets.ReadOnlyModelViewSet):
      - location: geojson
      - distance: float, in meters
      - rating: int, in range 1..5
-     - tags_titles: list of str as str (delimeter: ',')
-     - types_titles: list of str as str (delimeter: ',')
-     - priceranges_titles: list of str as str (delimeter: ',')
+     - tags_titles: list of str
+     - types_titles: list of str
+     - priceranges_titles: list of str
     """
 
     serializer_class = PlaceSerializer

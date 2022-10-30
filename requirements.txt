@@ -20,3 +20,4 @@ djangorestframework-gis
 setuptools<58.0.0
 pygdal==3.2.2.*
 django-extensions
+whitenoise

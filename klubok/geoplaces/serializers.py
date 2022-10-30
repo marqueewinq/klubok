@@ -2,7 +2,6 @@ from rest_framework import serializers
 from rest_framework_gis import serializers as serializers_gis
 
 from geoplaces.models import Place
-from geoplaces.fields import CharacterSeparatedField
 
 
 class PlaceSerializer(serializers.ModelSerializer):
@@ -38,9 +37,9 @@ class PlaceSearchSerializer(serializers.Serializer):
 
     rating = serializers.IntegerField(required=False)
 
-    tags_titles = CharacterSeparatedField(required=False, separator=",")
-    types_titles = CharacterSeparatedField(required=False, separator=",")
-    priceranges_titles = CharacterSeparatedField(required=False, separator=",")
+    tags_titles = serializers.ListField(required=False)
+    types_titles = serializers.ListField(required=False)
+    priceranges_titles = serializers.ListField(required=False)
 
     def validate(self, data):
         if ("location" in data or "distance" in data) and not (

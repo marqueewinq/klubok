@@ -24,19 +24,9 @@ services:
       << : *shared-envvar
       ALLOWED_HOSTS: '["localhost"]'
       CORS_ALLOWED_ORIGINS: '["http://localhost"]'
-    # Docker hack to wait until Postgres is up, then run stuff.
-    command: >
-      bash -c "while ! nc -w 1 -z db 5432;
-               do sleep 0.1;
-               done;
-               ./manage.py migrate;
-               while :;
-               do ./manage.py runserver 0.0.0.0:80;
-               sleep 1;
-               done"
     ports:
       - "80:80"
     volumes:
-      - ./klubok:/code
+      - ./klubok:/code/klubok/
     depends_on:
       - db
