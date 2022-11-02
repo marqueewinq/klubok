@@ -1,5 +1,5 @@
 build:
 	heroku container:push web
 
-deploy: push
+deploy:
 	heroku container:release web
