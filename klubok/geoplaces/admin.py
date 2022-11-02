@@ -1,9 +1,10 @@
 from django.contrib import admin
 from geoplaces.models import Place, PlacePricerange, PlaceTag, PlaceType
+from geoplaces.forms import PlaceForm
 
 
 class PlaceAdmin(admin.ModelAdmin):
-    pass
+    form = PlaceForm
 
 
 class PlaceTagAdmin(admin.ModelAdmin):
