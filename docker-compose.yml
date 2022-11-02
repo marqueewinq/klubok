@@ -27,7 +27,7 @@ services:
       CORS_ALLOWED_ORIGINS: '["http://localhost"]'
     ports:
       - "80:80"
-    command: gunicorn -b 0.0.0.0:80 klubok.wsgi
+    command: uvicorn --host ${HOST:-0.0.0.0} --port ${PORT:-80} klubok.asgi:application --reload
     volumes:
       - ./klubok:/code/klubok/
     depends_on:

@@ -1,37 +1,30 @@
 import random
 import string
 
-from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
 from django.urls import reverse
-from rest_framework import serializers
-from rest_framework.authtoken.models import Token
+from rest_framework import status
 from rest_framework.test import APITestCase
 
-from geoplaces.fields import CharacterSeparatedField
 from geoplaces.serializers import PlaceSearchSerializer
-from geoplaces.models import Place, PlacePricerange, PlaceTag, PlaceType
+from geoplaces.models import (
+    Place,
+    PlacePricerange,
+    PlaceTag,
+    PlaceType,
+    PlaceRatingSubmission,
+)
 from geoplaces.search import filter_queryset
+
+from constance import config
 
 
 def generate(length: int) -> str:
     return "".join(random.choice(string.ascii_lowercase) for i in range(length))
 
 
-class TestCharacterSeparatedManyField(APITestCase):
-    def test_field_from_native_should_return_list_for_given_str(self):
-        field = CharacterSeparatedField(child=serializers.CharField())
-        assert field.to_internal_value("a,b,c") == ["a", "b", "c"]
-
-
 class TestPlaceAPI(APITestCase):
     def setUp(self):
-        user_data = {"username": "Me", "password": "pwd"}
-        self.user = User.objects.create_user(**user_data)
-        self.client.force_authenticate(user=self.user)
-        self.client.post(reverse("rest_login"), data=user_data, format="json")
-        self.token = Token.objects.get(user=self.user).key
-
         PlaceTag.objects.bulk_create(
             [PlaceTag(title="Sport"), PlaceTag(title="Food"), PlaceTag(title="18+")]
         )
@@ -43,7 +36,7 @@ class TestPlaceAPI(APITestCase):
             ]
         )
         PlacePricerange.objects.bulk_create(
-            [PlacePricerange(title="$" * i) for i in range(3)]
+            [PlacePricerange(title="$" * i) for i in range(1, 3)]
         )
 
         self.n_places = 5
@@ -81,21 +74,21 @@ class TestPlaceAPI(APITestCase):
 
     def test_search_filter_queryset_m2m(self):
         tags = PlaceTag.objects.order_by("?")[:2]
-        data = {"tags__titles": [t.title for t in tags]}
+        data = {"tags_titles": [t.title for t in tags]}
         queryset = self._run_target(data)
         self.assertEqual(
             Place.objects.filter(tags__in=tags).distinct().count(), queryset.count()
         )
 
         types = PlaceType.objects.order_by("?")[:2]
-        data = {"types__titles": [t.title for t in types]}
+        data = {"types_titles": [t.title for t in types]}
         queryset = self._run_target(data)
         self.assertEqual(
             Place.objects.filter(types__in=types).distinct().count(), queryset.count()
         )
 
         ranges = PlacePricerange.objects.order_by("?")[:2]
-        data = {"priceranges__titles": [t.title for t in ranges]}
+        data = {"priceranges_titles": [t.title for t in ranges]}
         queryset = self._run_target(data)
         self.assertEqual(
             Place.objects.filter(priceranges__in=ranges).distinct().count(),
@@ -168,3 +161,41 @@ class TestPlaceAPI(APITestCase):
         for real_data, expected_count in real_data_list:
             queryset = self._run_target(real_data)
             self.assertEqual(expected_count, queryset.count())
+
+    def test_place_update_rating(self):
+        place = Place.objects.order_by("?").first()
+
+        old_rating = place.rating
+        place.update_rating()
+        self.assertEqual(old_rating, place.rating)
+
+        def _check(n_ratings):
+            for _ in range(n_ratings):
+                PlaceRatingSubmission.objects.create(
+                    place=place, rating=random.randint(0, 5), sender_id=generate(8)
+                )
+            rating_score_list = PlaceRatingSubmission.objects.order_by("-created_at")[
+                : config.RATING_SCORE_WINDOW
+            ].values_list("rating", flat=True)
+            avg_rating = int(sum(rating_score_list) / len(rating_score_list))
+
+            place.update_rating()
+            self.assertEqual(avg_rating, place.rating)
+
+        _check(config.RATING_SCORE_WINDOW // 2)
+        _check(config.RATING_SCORE_WINDOW * 2)
+
+    def test_submit_rating_api(self):
+        place = Place.objects.order_by("?").first()
+        new_rating = random.randint(0, 5)
+        data = {
+            "sender_id": generate(16),
+            "place": str(place.uuid),
+            "rating": new_rating,
+        }
+        response = self.client.post(
+            reverse("place-submit-rating", kwargs={"pk": place.pk}), data=data
+        )
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code, response.json())
+
+        self.assertEqual(1, PlaceRatingSubmission.objects.filter(place=place).count())

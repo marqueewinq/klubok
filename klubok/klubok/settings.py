@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_gis",
     "rest_framework.authtoken",
-    "rest_auth",
     "constance.backends.database",
     "constance",
     "corsheaders",
@@ -143,4 +142,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
 
-CONSTANCE_CONFIG: ty.Dict[str, ty.Tuple[ty.Any, str, ty.Type]] = {}
+CONSTANCE_CONFIG: ty.Dict[str, ty.Tuple[ty.Any, str, ty.Type]] = {
+    "RATING_SCORE_WINDOW": (
+        20,
+        "How many most recent ratings to include in rating calculation?",
+        int,
+    )
+}

@@ -1,7 +1,13 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, decorators, status
+from rest_framework.response import Response
+from django.db import transaction
 
 from geoplaces.models import Place
-from geoplaces.serializers import PlaceSearchSerializer, PlaceSerializer
+from geoplaces.serializers import (
+    PlaceSearchSerializer,
+    PlaceSerializer,
+    PlaceIncreaseRatingSerializer,
+)
 from geoplaces.search import filter_queryset
 
 
@@ -29,3 +35,22 @@ class PlaceViewSet(viewsets.ReadOnlyModelViewSet):
         return filter_queryset(
             queryset=Place.objects.all().order_by("-updated_at"), serializer=serializer
         )
+
+    @decorators.action(
+        detail=True,
+        methods=["POST"],
+        url_name="submit-rating",
+        serializer_class=PlaceIncreaseRatingSerializer,
+    )
+    def submit_rating(self, request, pk=None):
+        serializer = PlaceIncreaseRatingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        place = self.get_object()
+
+        # update the place rating with moving average over last ratings
+        with transaction.atomic():
+            serializer.save(place=place)
+            place.update_rating().save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -1,10 +1,15 @@
 from rest_framework import serializers
 from rest_framework_gis import serializers as serializers_gis
+from django.core.validators import MinValueValidator, MaxValueValidator
 
-from geoplaces.models import Place
+from geoplaces.models import Place, PlaceRatingSubmission
 
 
 class PlaceSerializer(serializers.ModelSerializer):
+    rating = serializers.IntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(5)]
+    )
+
     tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field="title")
     types = serializers.SlugRelatedField(many=True, read_only=True, slug_field="title")
     priceranges = serializers.SlugRelatedField(
@@ -35,7 +40,9 @@ class PlaceSearchSerializer(serializers.Serializer):
     location = serializers_gis.GeometryField(required=False)
     distance = serializers.FloatField(required=False)
 
-    rating = serializers.IntegerField(required=False)
+    rating = serializers.IntegerField(
+        required=False, validators=[MinValueValidator(0), MaxValueValidator(5)]
+    )
 
     tags_titles = serializers.ListField(required=False)
     types_titles = serializers.ListField(required=False)
@@ -49,3 +56,15 @@ class PlaceSearchSerializer(serializers.Serializer):
                 "You must provide both location and distance"
             )
         return super().validate(data)
+
+
+class PlaceIncreaseRatingSerializer(serializers.ModelSerializer):
+    uuid = serializers.UUIDField(read_only=True)
+
+    rating = serializers.IntegerField(
+        required=True, validators=[MinValueValidator(0), MaxValueValidator(5)]
+    )
+
+    class Meta:
+        model = PlaceRatingSubmission
+        fields = ["uuid", "rating", "sender_id", "place"]
