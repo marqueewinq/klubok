@@ -23,11 +23,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "mv=&^z)f&(+*x0#*%q03v2x6-^@^e9=!#(i^v7op=$07n1otd$"
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = bool(os.environ.get("DEBUG", False))
 
 ALLOWED_HOSTS: ty.List[str] = [] + json.loads(os.getenv("ALLOWED_HOSTS", "[]"))
 
@@ -81,8 +79,6 @@ TEMPLATES = [
     }
 ]
 
-WSGI_APPLICATION = "klubok.wsgi.application"
-
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
@@ -122,13 +118,9 @@ REST_FRAMEWORK = {
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_L10N = True
-
 USE_TZ = True
 
 
