@@ -31,6 +31,7 @@ class PlaceSerializer(serializers.ModelSerializer):
             "priceranges",
             "created_at",
             "updated_at",
+            "promo_code",
         ]
 
 

@@ -6,6 +6,8 @@ from geoplaces.forms import PlaceForm
 class PlaceAdmin(admin.ModelAdmin):
     form = PlaceForm
 
+    list_display = ["title", "rating", "description"]
+
 
 class PlaceTagAdmin(admin.ModelAdmin):
     pass

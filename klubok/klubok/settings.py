@@ -113,7 +113,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 

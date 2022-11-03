@@ -1,6 +1,7 @@
 from uuid import uuid4
 from constance import config
 from django.contrib.gis.db import models as gis_models
+from django.contrib.postgres.indexes import GistIndex
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from klubok.models import BaseModel
@@ -9,8 +10,8 @@ from klubok.models import BaseModel
 class Place(BaseModel):
     uuid = models.UUIDField(default=uuid4, primary_key=True)
 
-    title = models.CharField(max_length=255)
-    description = models.CharField(max_length=1024)
+    title = models.CharField(max_length=255, db_index=True)
+    description = models.CharField(max_length=1024, db_index=True)
     url_img = models.URLField(max_length=512)
 
     rating = models.SmallIntegerField(
@@ -19,13 +20,23 @@ class Place(BaseModel):
 
     location = gis_models.PointField(geography=True, srid=4326)
 
-    tags = models.ManyToManyField("geoplaces.PlaceTag", related_name="places")
-    types = models.ManyToManyField("geoplaces.PlaceType", related_name="places")
+    tags = models.ManyToManyField(
+        "geoplaces.PlaceTag", related_name="places", blank=True
+    )
+    types = models.ManyToManyField(
+        "geoplaces.PlaceType", related_name="places", blank=True
+    )
     priceranges = models.ManyToManyField(
-        "geoplaces.PlacePricerange", related_name="places"
+        "geoplaces.PlacePricerange", related_name="places", blank=True
     )
 
     promo_code = models.CharField(max_length=255, null=True, blank=True, default=None)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["title", "description"]),
+            GistIndex(fields=["location"]),
+        ]
 
     def __str__(self) -> str:
         return self.title

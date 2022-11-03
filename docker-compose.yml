@@ -25,7 +25,7 @@ services:
       << : *shared-envvar
       ALLOWED_HOSTS: '["localhost"]'
       CORS_ALLOWED_ORIGINS: '["http://localhost"]'
-      SECRET_KEY: "mv=&^z)f&(+*x0#*%q03v2x6-^@^e9=!#(i^v7op=$07n1otd$"
+      SECRET_KEY: "mvWvaF5v53pm4zUiGO2frG"
       DEBUG: 1
     ports:
       - "80:80"

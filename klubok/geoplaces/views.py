@@ -3,12 +3,8 @@ from rest_framework.response import Response
 from django.db import transaction
 
 from geoplaces.models import Place
-from geoplaces.serializers import (
-    PlaceSearchSerializer,
-    PlaceSerializer,
-    PlaceIncreaseRatingSerializer,
-)
-from geoplaces.search import filter_queryset
+from geoplaces.serializers import PlaceSerializer, PlaceIncreaseRatingSerializer
+from geoplaces.filters import GeoPlacesFilter
 
 
 class PlaceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -26,15 +22,13 @@ class PlaceViewSet(viewsets.ReadOnlyModelViewSet):
      - priceranges_titles: list of str
     """
 
+    queryset = (
+        Place.objects.all()
+        .prefetch_related("tags", "types", "priceranges")
+        .order_by("-updated_at")
+    )
     serializer_class = PlaceSerializer
-
-    def get_queryset(self):
-        serializer = PlaceSearchSerializer(data=self.request.query_params)
-        serializer.is_valid(raise_exception=True)
-
-        return filter_queryset(
-            queryset=Place.objects.all().order_by("-updated_at"), serializer=serializer
-        )
+    filter_backends = [GeoPlacesFilter]
 
     @decorators.action(
         detail=True,

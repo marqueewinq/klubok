@@ -14,7 +14,8 @@ from geoplaces.models import (
     PlaceType,
     PlaceRatingSubmission,
 )
-from geoplaces.search import filter_queryset
+from geoplaces.filters import GeoPlacesFilter
+
 
 from constance import config
 
@@ -25,25 +26,35 @@ def generate(length: int) -> str:
 
 class TestPlaceAPI(APITestCase):
     def setUp(self):
+        n_tags = 4
         PlaceTag.objects.bulk_create(
-            [PlaceTag(title="Sport"), PlaceTag(title="Food"), PlaceTag(title="18+")]
+            [
+                PlaceTag(title="Sport"),
+                PlaceTag(title="Food"),
+                PlaceTag(title="18+"),
+                PlaceTag(title="Between"),
+            ]
         )
+        n_types = 5
         PlaceType.objects.bulk_create(
             [
                 PlaceType(title="At home"),
                 PlaceType(title="Party"),
+                PlaceType(title="I see you are"),
                 PlaceType(title="Cultural"),
+                PlaceType(title="As well"),
             ]
         )
+        n_priceranges = 5
         PlacePricerange.objects.bulk_create(
-            [PlacePricerange(title="$" * i) for i in range(1, 3)]
+            [PlacePricerange(title="$" * i) for i in range(1, 5)]
         )
 
         self.n_places = 5
         for i in range(self.n_places):
-            n_tags = random.randint(1, 9)
-            n_types = random.randint(1, 9)
-            n_priceranges = random.randint(1, 9)
+            n_select_tags = random.randint(0, n_tags)
+            n_select_types = random.randint(0, n_types)
+            n_select_priceranges = random.randint(0, n_priceranges)
             place = Place.objects.create(
                 title=generate(8),
                 description=generate(24),
@@ -51,48 +62,79 @@ class TestPlaceAPI(APITestCase):
                 rating=random.randint(1, 5),
                 location=Point(random.random() * 10, random.random() * 10 + 10),
             )
-            place.tags.set(PlaceTag.objects.order_by("?")[:n_tags])
-            place.types.set(PlaceType.objects.order_by("?")[:n_types])
-            place.priceranges.set(PlacePricerange.objects.order_by("?")[:n_priceranges])
+            place.tags.set(PlaceTag.objects.order_by("?")[:n_select_tags])
+            place.types.set(PlaceType.objects.order_by("?")[:n_select_types])
+            place.priceranges.set(
+                PlacePricerange.objects.order_by("?")[:n_select_priceranges]
+            )
 
     def test_places_api(self):
         response = self.client.get(reverse("place-list"))
         self.assertEqual(200, response.status_code)
 
-    @staticmethod
-    def _run_target(data):
+        place = Place.objects.order_by("?").first()
+        response = self.client.get(reverse("place-detail", kwargs={"pk": place.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def _run_target_against_api(self, data):
+        response = self.client.get(reverse("place-list"), data=data)
+        self.assertEqual(200, response.status_code, response.json())
+
         serializer = PlaceSearchSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        return filter_queryset(queryset=Place.objects.all(), serializer=serializer)
+
+        queryset = GeoPlacesFilter._filter_queryset(
+            queryset=Place.objects.prefetch_related(
+                "tags", "types", "priceranges"
+            ).all(),
+            serializer=serializer,
+        )
+        self.assertEqual(response.json()["count"], queryset.count())
+
+        return queryset
+
+    @staticmethod
+    def _run_target_against_filter(data):
+        serializer = PlaceSearchSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        return GeoPlacesFilter._filter_queryset(
+            queryset=Place.objects.prefetch_related(
+                "tags", "types", "priceranges"
+            ).all(),
+            serializer=serializer,
+        )
 
     def test_search_filter_queryset_text(self):
         random_place = Place.objects.order_by("?").first()
         data = {"text": random_place.title}
-        queryset = self._run_target(data)
+        queryset = self._run_target_against_api(data)
         self.assertEqual(1, queryset.count())
         self.assertEqual(random_place.uuid, queryset.first().uuid)
 
     def test_search_filter_queryset_m2m(self):
-        tags = PlaceTag.objects.order_by("?")[:2]
+        # Combining multiple aggregations will yield the wrong results
+        #  because joins are used instead of subqueries -- we use
+        #  len() instead of count() because of this
+        tags = list(PlaceTag.objects.order_by("?")[:2])
         data = {"tags_titles": [t.title for t in tags]}
-        queryset = self._run_target(data)
+        queryset = self._run_target_against_api(data)
         self.assertEqual(
-            Place.objects.filter(tags__in=tags).distinct().count(), queryset.count()
+            len(Place.objects.filter(tags__in=tags).distinct()), len(queryset)
         )
 
-        types = PlaceType.objects.order_by("?")[:2]
+        types = list(PlaceType.objects.order_by("?")[:2])
         data = {"types_titles": [t.title for t in types]}
-        queryset = self._run_target(data)
+        queryset = self._run_target_against_api(data)
         self.assertEqual(
-            Place.objects.filter(types__in=types).distinct().count(), queryset.count()
+            len(Place.objects.filter(types__in=types).distinct()), len(queryset)
         )
 
-        ranges = PlacePricerange.objects.order_by("?")[:2]
+        ranges = list(PlacePricerange.objects.order_by("?")[:2])
         data = {"priceranges_titles": [t.title for t in ranges]}
-        queryset = self._run_target(data)
+        queryset = self._run_target_against_api(data)
         self.assertEqual(
-            Place.objects.filter(priceranges__in=ranges).distinct().count(),
-            queryset.count(),
+            len(Place.objects.filter(priceranges__in=ranges).distinct()), len(queryset)
         )
 
     def test_search_filter_queryset_gis(self):
@@ -100,7 +142,7 @@ class TestPlaceAPI(APITestCase):
             "distance": 5.0,
             "location": {"type": "Point", "coordinates": [2.0, 2.0]},
         }
-        queryset = self._run_target(faraway_data)
+        queryset = self._run_target_against_filter(faraway_data)
         self.assertEqual(0, queryset.count())
 
         nearby_data = {
@@ -108,7 +150,7 @@ class TestPlaceAPI(APITestCase):
             "location": {"type": "Point", "coordinates": [10.0, 20.0]},
             "rating": 1,
         }
-        queryset = self._run_target(nearby_data)
+        queryset = self._run_target_against_filter(nearby_data)
         self.assertTrue(queryset.count() > 0)
 
     def test_search_filter_queryset_gis_realdata(self):
@@ -116,7 +158,7 @@ class TestPlaceAPI(APITestCase):
         places = [
             (30.304_845_367_774_753, 59.943_085_766_577_525),
             (30.325_740_996_093_44, 59.930_767_681_937_645),
-        ]
+        ]  # some points on a Vasilyevsky island
 
         for idx, (lat, lon) in enumerate(places):
             Place.objects.create(
@@ -159,7 +201,7 @@ class TestPlaceAPI(APITestCase):
             ),
         ]
         for real_data, expected_count in real_data_list:
-            queryset = self._run_target(real_data)
+            queryset = self._run_target_against_filter(real_data)
             self.assertEqual(expected_count, queryset.count())
 
     def test_place_update_rating(self):
